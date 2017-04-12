@@ -30,8 +30,6 @@ MaxFinder::MaxFinder(Computer *computers, int numComputers, int numTerminals) : 
     strcpy(c[i].address, computers[i].address);
     c[i].index = i;
   }
-  //cout << endl;
-  
   
   //store final = final destination node in our MaxFinder class to be used in calcMaxFlow
   final = computers[_numComputers-1].address;
@@ -39,6 +37,7 @@ MaxFinder::MaxFinder(Computer *computers, int numComputers, int numTerminals) : 
 
 int MaxFinder::calcMaxFlow(Edge *edges, int numEdges)
 {
+  
   maxFlow = 0;
   
   newEdges = new edges2[numEdges];
@@ -66,7 +65,7 @@ int MaxFinder::calcMaxFlow(Edge *edges, int numEdges)
     newEdges[e].src = currentSrcIndex;
     newEdges[e].dest = currentDestIndex;
     newEdges[e].reg = edges[e].capacity;
-    newEdges[e].back = 0;
+    //newEdges[e].back = 0;
     
     if( currentDestIndex > _numTerminals-1 )
     {
@@ -87,50 +86,21 @@ int MaxFinder::calcMaxFlow(Edge *edges, int numEdges)
     }
   }
   
-  //Cout our adjacency list for testing purposes
-  // for (int i = 0; i < _numComputers; i++ )
-  // {
-  //   cout << c[i].address << "(" << i << ")";
-  //   for( int x = 0; x < c[i].adjencyCount; x++)
-  //   {
-  //     if( c[i].adjacentEdgesBackFlow[x] == false )
-  //     {
-  //       cout << " -> " << c[newEdges[c[i].adjenctEdges[x]].dest].address;
-  //       if( c[newEdges[c[i].adjenctEdges[x]].dest].address == c[i].address)
-  //         cout << "FOUND ERROR" << endl;
-  //     }
-  //     else if( c[i].adjacentEdgesBackFlow[x] == true )
-  //     {
-  //       cout << " -> " << c[newEdges[c[i].adjenctEdges[x]].src].address;
-  //       if( c[newEdges[c[i].adjenctEdges[x]].src].address == c[i].address)
-  //         cout << "FOUND ERROR" << endl;
-  //     }
-  //   }
-  //   cout << " Adjecents: " << c[i].adjencyCount << endl;
-  // } 
-  
-  // cout << endl; 
-  
-  comp2* ITEM_NOT_FOUND; 
-  SplayTree<comp2* > splay(ITEM_NOT_FOUND);
-  Paths newPath;
-  
-  int ITEM_NOT_FOUND2;
-  QuadraticHashTable2<int> visitedVertexes(ITEM_NOT_FOUND2);
-  
-  int searchNum = 0;
+  BinaryHeap<comp2* > splay(10000);
 
-    for ( int i = 0; i < _numTerminals; i++ )
-    {
-      visitedVertexes.insert(i);
-      splay.insert( &c[i] );
-    }
-    while ( !splay.isEmpty() )
+	 bool visitedVertexes[5000];
+	 
+    int searchNum = 0;
+
+    int times = 0;
+    
+     visitedVertexes[0] = true;
+	  splay.insert( &c[0] );
+	 
+    while ( !splay.isEmpty() && times < _numTerminals )
     {
       int compIndex = splay.findMax()->index;
-      splay.remove(splay.findMax());
-      
-      //cout << "Splayed out: " << c[compIndex].address << endl;
+      splay.deleteMin();
       
       if( compIndex != _numComputers - 1) // If we're not at final
       {
@@ -144,11 +114,8 @@ int MaxFinder::calcMaxFlow(Edge *edges, int numEdges)
           int compDest = backFlow ? newEdges[edgeNum].src : newEdges[edgeNum].dest;
           
           int flow = c[compIndex].adjacentEdgesBackFlow[a] ? newEdges[edgeNum].back : newEdges[edgeNum].reg;
-          
-          //cout << "compSrc: " << c[compSrc].address << " compDest: " << c[compDest].address << " flow: " << flow << endl;
-          //cout << "dv: " << c[compDest].dv << " pv: " << c[c[compDest].pv].address << endl;
-          
-          // Refresh pv & dv if new dijkstras table
+
+          // Refresh dv if new dijkstras table
           if( searchNum != c[compDest].searchNumber)
           {
             c[compDest].dv = -1;
@@ -156,30 +123,36 @@ int MaxFinder::calcMaxFlow(Edge *edges, int numEdges)
             c[compDest].searchNumber = searchNum;
           }
 
-          if( flow != 0  && flow >= c[compDest].dv && visitedVertexes.findInt(compDest) == ITEM_NOT_FOUND2 )
+          if( flow != 0  && flow > c[compDest].dv && !visitedVertexes[compDest] )
           {
             c[compDest].pv = compSrc;
             c[compDest].dv = flow;
             c[compDest].min = (c[compSrc].min == -1 || flow < c[compSrc].min) ? flow : c[compSrc].min;
             c[compDest].edge = edgeNum;
-            visitedVertexes.insertInt(compSrc);
+            visitedVertexes[compDest] = true;
             c[compDest].backFlow = backFlow;
             splay.insert( &c[compDest] );
-            //cout << "Inserted: " << c[compDest].address << " dv: " << c[compDest].dv << " pv: " << c[c[compDest].pv].address <<"(" << c[compDest].pv << ")" << " min: " << c[compDest].min << endl;
           }
+        }
+        if( splay.isEmpty() )
+        {
+          times++;
+           visitedVertexes[times] = true;
+          //visitedVertexes.insert(times);
+          splay.insert( &c[times] );
         }
       }
       else //if we are at final
       {
-        //cout << endl << c[compIndex].address;
         int edgeNum = c[compIndex].edge;
+        bool backFlow = c[compIndex].backFlow;
         int flowMin = c[compIndex].min;
         
-        while( true )
+        while( flowMin > 0 && c[c[compIndex].pv].pv != -1 )
         {
           edgeNum = c[compIndex].edge;
           
-          bool backFlow = c[compIndex].backFlow;
+          backFlow = c[compIndex].backFlow;
           int compSrc = c[compIndex].pv;
           
           if( backFlow )
@@ -192,37 +165,23 @@ int MaxFinder::calcMaxFlow(Edge *edges, int numEdges)
             newEdges[edgeNum].reg -= flowMin;
             newEdges[edgeNum].back += flowMin;
           }
-          c[compIndex].min = -1;//= ( c[compIndex].dv < c[compDest].min) ? c[compIndex].dv : c[compDest].min;
-          
-          // cout << " <- ";
-          // cout << c[compSrc].address; //" pv: " << c[compIndex].pv << " CompIndex: " << compIndex << " compSrc " << compSrc << endl ;
-          
-          if ( c[compSrc].pv != -1 )
-          {
             c[compIndex].dv = -1;
-            c[compIndex].pv = -1;
             compIndex = compSrc;
-          }
-          else 
-          {
-            c[compIndex].dv -= flowMin;
-            break;
-          }
         }
-        //cout << " Flow: " << flowMin << endl << endl;
-        
-       // cout << c[5].pv << endl;
         maxFlow += flowMin;
         
         searchNum++;
-        visitedVertexes.makeEmpty();
-        splay.makeEmpty();
-        for ( int i = 0; i < _numTerminals; i++ )
-        {
-          visitedVertexes.insert(i);
-          splay.insert( &c[i] );
-        }
-      }
+        
+        if( splay.isEmpty() )
+          times++;
+        else splay.makeEmpty();
+        
+        for( int o = 0; o < 5000; o++)
+          visitedVertexes[o] = false;
+
+        visitedVertexes[times] = true;
+          splay.insert( &c[times] );
+     }
   }
     
     return maxFlow;
